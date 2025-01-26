@@ -14,15 +14,23 @@ db.query(`CREATE TABLE IF NOT EXISTS timezones (
 
 const initialData = db.query('SELECT COUNT(*) as count FROM timezones').get();
 if (initialData.count === 0) {
-    const initialTimezones = [
-        ['Roma', 'Europe/Rome', 1],
-        ['New York', 'America/New_York', -5]
-    ];
-    //TODO: Get timezones from csv
+    const csvData = await Bun.file('timezones.csv').text();
+    const lines = csvData.split('\n');
+    const timezones = lines.slice(1)
+        .filter(line => line.trim())
+        .map(line => {
+            const [timezone, offset] = line.replace(/"/g, '').split(',');
+            const city = timezone.split('/').pop().replace(/_/g, ' '); // last part is city name
+            return [city, timezone, parseInt(offset)/3600]; // seconds to hours
+        });
 
     const insert = db.prepare('INSERT INTO timezones (city, timezone, offset) VALUES (?, ?, ?)');
-    initialTimezones.forEach(([city, timezone, offset]) => {
-        insert.run(city, timezone, offset);
+    timezones.forEach(([city, timezone, offset]) => {
+        try {
+            insert.run(city, timezone, offset);
+        } catch (err) {
+            console.log(`Skipped duplicate entry for ${city}`);
+        }
     });
 }
 
