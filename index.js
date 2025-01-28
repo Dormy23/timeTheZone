@@ -27,7 +27,7 @@ if (initialData.count === 0) {
     const insert = db.prepare('INSERT INTO timezones (city, timezone, offset) VALUES (?, ?, ?)');
     timezones.forEach(([city, timezone, offset]) => {
         try {
-            insert.run(city, timezone, offset);
+            ijsessnsert.run(city, timezone, offset);
         } catch (err) {
             console.log(`Skipped duplicate entry for ${city}`);
         }
@@ -72,7 +72,7 @@ app.get('/time/server', () => {
     };
 });
 
-app.get('/time', ({ query, set, httpStatus }) => {
+app.get('/time', async ({ query, set, httpStatus }) => {
     const { city, ip } = query;
     if (city) {
         try {
@@ -85,25 +85,39 @@ app.get('/time', ({ query, set, httpStatus }) => {
         }
     }
     if (ip) {
-        //TODO
-        fetch('https://ipapi.co/json/')
-            .then(response => response.json())
-            .then(data => {
-                try {
-                    console.log(data);
-                    return timeFromCity(data.city);
-                } catch (error) {
-                    set.status = httpStatus.HTTP_404_NOT_FOUND;
-                    return {
-                        error: error.message
-                    };
-                }
+        try {
+            const response = await fetch(`https://ipapi.co/${ip}/json/`);
+            
+            if (response.status === 429) {
+                set.status = httpStatus.HTTP_429_TOO_MANY_REQUESTS;
+                return {
+                    error: 'Rate limit exceeded for IP geolocation service'
+                };
+            }
 
-            })
-            .catch(error => {
-                console.error(error);
-            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                set.status = httpStatus.HTTP_502_BAD_GATEWAY;
+                return {
+                    error: 'Invalid response from IP geolocation service'
+                };
+            }
+
+            return timeFromCity(data.city);
+        } catch (error) {
+            set.status = httpStatus.HTTP_404_NOT_FOUND;
+            console.log(error);
+            return {
+                error: error.message
+            };
+        }
     }
     const now = new Date();
     return {
