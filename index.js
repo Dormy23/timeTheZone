@@ -27,7 +27,7 @@ if (initialData.count === 0) {
     const insert = db.prepare('INSERT INTO timezones (city, timezone, offset) VALUES (?, ?, ?)');
     timezones.forEach(([city, timezone, offset]) => {
         try {
-            ijsessnsert.run(city, timezone, offset);
+            insert.run(city, timezone, offset);
         } catch (err) {
             console.log(`Skipped duplicate entry for ${city}`);
         }
